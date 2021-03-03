@@ -2,7 +2,9 @@
 
 This is a project to deploy object tracking algorithm with yolov5 and TensorRT. Sort and Deep-sort algorithm are used to track the objects.
 Thanks for the contribution of [tensorrtx](https://github.com/wang-xinyu/tensorrtx) and [sort-cpp](https://github.com/yasenh/sort-cpp)!
-Now this project implements the tracki algorithm with yolov5 and sort(c++ version). Please wait for the update for deep-sort and python implemention. 
+Now this project implements the tracki algorithm with yolov5 and sort(c++ version). **Deep-sort, multi-thread acceleration and python implemention** will be updated soon. Please give a star if this project helps ^_^
+
+QQ group: 131571091
 
 ![example result of object tracking](https://github.com/AsakusaRinne/tensorrt_yolov5_tracker/blob/main/example.gif)
 ## Table of Contents
