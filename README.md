@@ -38,7 +38,7 @@ You could change the input image size in ``yolov5/yololayer.h``
 
 We provide the support for building models of yolov5-3.1 and yolov5-4.0 in our project. The default branch is corresponding to yolov5-4.0. Please change to ``c269f65`` if you want to use yolov5-3.1 models to build engines.
 
-If other versions are wanted, please kindly refer to [tensorrtx](https://github.com/wang-xinyu/tensorrtx) to build the engine and then copy to the 
+If other versions are wanted, please kindly refer to [tensorrtx](https://github.com/wang-xinyu/tensorrtx) to build the engine and then copy to the folder of this project.
 
 
 ### Build engine
