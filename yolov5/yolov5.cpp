@@ -34,101 +34,67 @@ int get_depth(int x) {
     }
 }
 
-
-
 ICudaEngine* build_engine(std::string weightFile,unsigned int maxBatchSize, IBuilder* builder, IBuilderConfig* config, DataType dt) {
-    std::cout << -1 << std::endl;
     INetworkDefinition* network = builder->createNetworkV2(0U);
 
     // Create input tensor of shape {3, INPUT_H, INPUT_W} with name INPUT_BLOB_NAME
-    std::cout << -2 << std::endl;
     ITensor* data = network->addInput(INPUT_BLOB_NAME, dt, Dims3{ 3, INPUT_H, INPUT_W });
-    std::cout << -3 << std::endl;
     assert(data);
 
-    std::cout << -4 << std::endl;
     std::map<std::string, Weights> weightMap = loadWeights(weightFile);
-    std::cout << -5 << std::endl;
     Weights emptywts{ DataType::kFLOAT, nullptr, 0 };
 
     /* ------ yolov5 backbone------ */
     auto focus0 = focus(network, weightMap, *data, 3, get_width(64), 3, "model.0");
-    std::cout << 0 << std::endl;
     auto conv1 = convBlock(network, weightMap, *focus0->getOutput(0), get_width(128), 3, 2, 1, "model.1");
-    std::cout << 1 << std::endl;
-    auto bottleneck_CSP2 = bottleneckCSP(network, weightMap, *conv1->getOutput(0), get_width(128), get_width(128), get_depth(3), true, 1, 0.5, "model.2");
-    std::cout << 2 << std::endl;
+    auto bottleneck_CSP2 = C3(network, weightMap, *conv1->getOutput(0), get_width(128), get_width(128), get_depth(3), true, 1, 0.5, "model.2");
     auto conv3 = convBlock(network, weightMap, *bottleneck_CSP2->getOutput(0), get_width(256), 3, 2, 1, "model.3");
-    std::cout << 3 << std::endl;
-    auto bottleneck_csp4 = bottleneckCSP(network, weightMap, *conv3->getOutput(0), get_width(256), get_width(256), get_depth(9), true, 1, 0.5, "model.4");
-    std::cout << 4 << std::endl;
-    auto conv5 = convBlock(network, weightMap, *bottleneck_csp4->getOutput(0),get_width(512), 3, 2, 1, "model.5");
-    std::cout << 5 << std::endl;
-    auto bottleneck_csp6 = bottleneckCSP(network, weightMap, *conv5->getOutput(0), get_width(512), get_width(512), get_depth(9), true, 1, 0.5, "model.6");
-    std::cout << 6 << std::endl;
+    auto bottleneck_csp4 = C3(network, weightMap, *conv3->getOutput(0), get_width(256), get_width(256), get_depth(9), true, 1, 0.5, "model.4");
+    auto conv5 = convBlock(network, weightMap, *bottleneck_csp4->getOutput(0), get_width(512), 3, 2, 1, "model.5");
+    auto bottleneck_csp6 = C3(network, weightMap, *conv5->getOutput(0), get_width(512), get_width(512), get_depth(9), true, 1, 0.5, "model.6");
     auto conv7 = convBlock(network, weightMap, *bottleneck_csp6->getOutput(0), get_width(1024), 3, 2, 1, "model.7");
-    std::cout << 7 << std::endl;
     auto spp8 = SPP(network, weightMap, *conv7->getOutput(0), get_width(1024), get_width(1024), 5, 9, 13, "model.8");
-    std::cout << 8 << std::endl;
 
     /* ------ yolov5 head ------ */
-    auto bottleneck_csp9 = bottleneckCSP(network, weightMap, *spp8->getOutput(0), get_width(1024), get_width(1024), get_depth(3), false, 1, 0.5, "model.9");
-    std::cout << 9 << std::endl;
+    auto bottleneck_csp9 = C3(network, weightMap, *spp8->getOutput(0), get_width(1024), get_width(1024), get_depth(3), false, 1, 0.5, "model.9");
     auto conv10 = convBlock(network, weightMap, *bottleneck_csp9->getOutput(0), get_width(512), 1, 1, 1, "model.10");
-    std::cout << 10 << std::endl;
 
-    float *deval = reinterpret_cast<float*>(malloc(sizeof(float) * get_width(512) * 2 * 2));
-    std::cout << 11 << std::endl;
+    float* deval = reinterpret_cast<float*>(malloc(sizeof(float) * get_width(512) * 2 * 2));
     for (int i = 0; i < get_width(512) * 2 * 2; i++) {
         deval[i] = 1.0;
     }
     Weights deconvwts11{ DataType::kFLOAT, deval, get_width(512) * 2 * 2 };
-    std::cout << 12 << std::endl;
     IDeconvolutionLayer* deconv11 = network->addDeconvolutionNd(*conv10->getOutput(0), get_width(512), DimsHW{ 2, 2 }, deconvwts11, emptywts);
-    std::cout << 13 << std::endl;
     deconv11->setStrideNd(DimsHW{ 2, 2 });
     deconv11->setNbGroups(get_width(512));
-    std::cout << 14 << std::endl;
     weightMap["deconv11"] = deconvwts11;
 
     ITensor* inputTensors12[] = { deconv11->getOutput(0), bottleneck_csp6->getOutput(0) };
-    std::cout << 15 << std::endl; 
     auto cat12 = network->addConcatenation(inputTensors12, 2);
-    std::cout << 151<< std::endl;
-    auto bottleneck_csp13 = bottleneckCSP(network, weightMap, *cat12->getOutput(0), get_width(1024), get_width(512), get_depth(3), false, 1, 0.5, "model.13");
-    std::cout << 16 << std::endl;
+    auto bottleneck_csp13 = C3(network, weightMap, *cat12->getOutput(0), get_width(1024), get_width(512), get_depth(3), false, 1, 0.5, "model.13");
     auto conv14 = convBlock(network, weightMap, *bottleneck_csp13->getOutput(0), get_width(256), 1, 1, 1, "model.14");
-    std::cout << 17 << std::endl;
 
     Weights deconvwts15{ DataType::kFLOAT, deval, get_width(256) * 2 * 2 };
-    std::cout <<18 << std::endl;
     IDeconvolutionLayer* deconv15 = network->addDeconvolutionNd(*conv14->getOutput(0), get_width(256), DimsHW{ 2, 2 }, deconvwts15, emptywts);
-    std::cout << 19 << std::endl;
     deconv15->setStrideNd(DimsHW{ 2, 2 });
     deconv15->setNbGroups(get_width(256));
-    std::cout << 20 << std::endl;
     ITensor* inputTensors16[] = { deconv15->getOutput(0), bottleneck_csp4->getOutput(0) };
     auto cat16 = network->addConcatenation(inputTensors16, 2);
 
-    auto bottleneck_csp17 = bottleneckCSP(network, weightMap, *cat16->getOutput(0), get_width(512), get_width(256), get_depth(3), false, 1, 0.5, "model.17");
-    std::cout << 21 << std::endl;
+    auto bottleneck_csp17 = C3(network, weightMap, *cat16->getOutput(0), get_width(512), get_width(256), get_depth(3), false, 1, 0.5, "model.17");
 
     // yolo layer 0
     IConvolutionLayer* det0 = network->addConvolutionNd(*bottleneck_csp17->getOutput(0), 3 * (Yolo::CLASS_NUM + 5), DimsHW{ 1, 1 }, weightMap["model.24.m.0.weight"], weightMap["model.24.m.0.bias"]);
     auto conv18 = convBlock(network, weightMap, *bottleneck_csp17->getOutput(0), get_width(256), 3, 2, 1, "model.18");
-    std::cout << 22 << std::endl;
     ITensor* inputTensors19[] = { conv18->getOutput(0), conv14->getOutput(0) };
     auto cat19 = network->addConcatenation(inputTensors19, 2);
-    auto bottleneck_csp20 = bottleneckCSP(network, weightMap, *cat19->getOutput(0), get_width(512), get_width(512), get_depth(3), false, 1, 0.5, "model.20");
-    std::cout << 23 << std::endl;
+    auto bottleneck_csp20 = C3(network, weightMap, *cat19->getOutput(0), get_width(512), get_width(512), get_depth(3), false, 1, 0.5, "model.20");
     //yolo layer 1
     IConvolutionLayer* det1 = network->addConvolutionNd(*bottleneck_csp20->getOutput(0), 3 * (Yolo::CLASS_NUM + 5), DimsHW{ 1, 1 }, weightMap["model.24.m.1.weight"], weightMap["model.24.m.1.bias"]);
     auto conv21 = convBlock(network, weightMap, *bottleneck_csp20->getOutput(0), get_width(512), 3, 2, 1, "model.21");
-    std::cout << 24 << std::endl;
     ITensor* inputTensors22[] = { conv21->getOutput(0), conv10->getOutput(0) };
     auto cat22 = network->addConcatenation(inputTensors22, 2);
-    auto bottleneck_csp23 = bottleneckCSP(network, weightMap, *cat22->getOutput(0), get_width(1024), get_width(1024), get_depth(3), false, 1, 0.5, "model.23");
-    std::cout << 25 << std::endl;
+    auto bottleneck_csp23 = C3(network, weightMap, *cat22->getOutput(0), get_width(1024), get_width(1024), get_depth(3), false, 1, 0.5, "model.23");
     IConvolutionLayer* det2 = network->addConvolutionNd(*bottleneck_csp23->getOutput(0), 3 * (Yolo::CLASS_NUM + 5), DimsHW{ 1, 1 }, weightMap["model.24.m.2.weight"], weightMap["model.24.m.2.bias"]);
 
     auto yolo = addYoLoLayer(network, weightMap, det0, det1, det2);
@@ -138,9 +104,16 @@ ICudaEngine* build_engine(std::string weightFile,unsigned int maxBatchSize, IBui
     // Build engine
     builder->setMaxBatchSize(maxBatchSize);
     config->setMaxWorkspaceSize(16 * (1 << 20));  // 16MB
-#ifdef USE_FP16
+#if defined(USE_FP16)
     config->setFlag(BuilderFlag::kFP16);
+#elif defined(USE_INT8)
+    std::cout << "Your platform support int8: " << (builder->platformHasFastInt8() ? "true" : "false") << std::endl;
+    assert(builder->platformHasFastInt8());
+    config->setFlag(BuilderFlag::kINT8);
+    Int8EntropyCalibrator2* calibrator = new Int8EntropyCalibrator2(1, INPUT_W, INPUT_H, "./coco_calib/", "int8calib.table", INPUT_BLOB_NAME);
+    config->setInt8Calibrator(calibrator);
 #endif
+
     std::cout << "Building engine, please wait for a while..." << std::endl;
     ICudaEngine* engine = builder->buildEngineWithConfig(*network, *config);
     std::cout << "Build engine successfully!" << std::endl;
@@ -156,6 +129,7 @@ ICudaEngine* build_engine(std::string weightFile,unsigned int maxBatchSize, IBui
 
     return engine;
 }
+
 
 
 void APIToModel(std::string weightFile, unsigned int maxBatchSize, IHostMemory** modelStream) {
