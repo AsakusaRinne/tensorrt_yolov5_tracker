@@ -14,9 +14,11 @@ Now this project implements the tracki algorithm with yolov5 and sort(c++ versio
 - [License](#license)
 
 ## ToDo
-***1.Deep-sort tracker.
-2.Multi-thread acceleration for c++.
-3.Python implemention.***
+***1.Deep-sort tracker.***
+
+***2.Multi-thread acceleration for c++.***
+
+***3.Python implemention.***
 
 
 ## Install
